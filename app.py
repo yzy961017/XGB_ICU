@@ -178,29 +178,35 @@ def display_global_explanations(model, X_train, shap_image):
 
     with f2:
         st.write('**SHAP依赖图**')
-        feature_options = shap_data_df.columns.tolist()
+        
+        # 清理特征名以便显示
+        feature_options = [name.replace('_', ' ') for name in shap_data_df.columns]
+        feature_mapping = {clean: orig for clean, orig in zip(feature_options, shap_data_df.columns)}
         
         # 找出最重要的特征作为默认选项
         vals = np.abs(shap_values).mean(0)
-        feature_importance = pd.DataFrame(list(zip(X_train.columns, vals)), columns=['col_name','feature_importance_vals'])
+        feature_importance = pd.DataFrame(list(zip(feature_options, vals)), columns=['col_name','feature_importance_vals'])
         feature_importance.sort_values(by=['feature_importance_vals'], ascending=False,inplace=True)
         most_important_feature = feature_importance.iloc[0].col_name
         default_index = feature_options.index(most_important_feature) if most_important_feature in feature_options else 0
         
-        selected_feature = st.selectbox("选择变量", options=feature_options, index=default_index)
+        selected_feature_cleaned = st.selectbox("选择变量", options=feature_options, index=default_index)
         
-        if selected_feature in shap_value_df.columns:
+        # 将用户选择的清晰名称映射回原始列名
+        selected_feature_orig = feature_mapping[selected_feature_cleaned]
+
+        if selected_feature_orig in shap_value_df.columns:
             fig = px.scatter(
-                x=shap_data_df[selected_feature], 
-                y=shap_value_df[selected_feature], 
-                color=shap_data_df[selected_feature],
+                x=shap_data_df[selected_feature_orig], 
+                y=shap_value_df[selected_feature_orig], 
+                color=shap_data_df[selected_feature_orig],
                 color_continuous_scale=['blue','red'],
-                labels={'x': f'{selected_feature} 的原始值', 'y': 'SHAP值'}
+                labels={'x': f'{selected_feature_cleaned} 的原始值', 'y': 'SHAP值'}
             )
             fig.update_layout(coloraxis_showscale=False)
             st.plotly_chart(fig, use_container_width=True)
         else:
-            st.warning(f"特征 '{selected_feature}' 的SHAP值不存在。")
+            st.warning(f"特征 '{selected_feature_cleaned}' 的SHAP值不存在。")
         st.info('SHAP依赖图显示了单个变量对模型预测的影响。它说明了一个特征的每个值是如何影响预测结果的。')
 
 def display_local_explanations(model, user_input_df, X_train):
@@ -246,9 +252,12 @@ def display_local_explanations(model, user_input_df, X_train):
         else:
             X_train_values = X_train
 
+        # 将特征名中的下划线替换为空格，以提高可读性
+        feature_names_cleaned = [name.replace('_', ' ') for name in X_train.columns]
+
         explainer = lime_tabular.LimeTabularExplainer(
             X_train_values, 
-            feature_names=X_train.columns.tolist(),
+            feature_names=feature_names_cleaned, # 使用清理后的特征名
             class_names=['非低血压', '低血压'], 
             mode='classification',
             feature_selection='auto'
@@ -257,20 +266,47 @@ def display_local_explanations(model, user_input_df, X_train):
         exp = explainer.explain_instance(
             user_input_df.values[0], 
             model.predict_proba, 
-            num_features=10
+            num_features=10,
+            labels=(1,) # 只解释"低血压"类别
         )
         
-        fig = exp.as_pyplot_figure()
+        # --- 手动生成LIME图以自定义颜色 ---
+        # 红色代表增加风险，绿色代表降低风险
+        exp_list = exp.as_list(label=1)
+        
+        # 检查是否获得了有效的解释
+        if not exp_list:
+            st.warning("LIME 未能为当前输入生成有效的解释。")
+            return
+
+        exp_list.reverse() # as_pyplot_figure会反转列表，在此模拟
+        
+        vals = [x[1] for x in exp_list]
+        names = [x[0] for x in exp_list]
+        
+        # 交换颜色：正向影响（增加风险）为红色，负向为绿色
+        colors = ['#d62728' if x > 0 else '#2ca02c' for x in vals]
+        
+        pos = np.arange(len(exp_list))
+        
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.barh(pos, vals, align='center', color=colors)
+        
+        ax.set_yticks(pos)
+        ax.set_yticklabels(names)
+        ax.set_title('Local explanation for class 低血压')
+        fig.tight_layout()
+        
         st.pyplot(fig)
         plt.close(fig)
         
-        st.info('''
+        st.markdown('''
         **LIME解释说明:**
         - 显示对当前预测影响最大的特征
-        - 右侧特征增加低血压风险
-        - 左侧特征降低低血压风险
+        - **<font color='red'>红色条 (右侧)</font>**: 增加低血压风险的特征
+        - **<font color='green'>绿色条 (左侧)</font>**: 降低低血压风险的特征
         - 数值表示对预测的具体影响
-        ''')
+        ''', unsafe_allow_html=True)
     except Exception as e:
         st.error(f"生成LIME图时出错: {e}")
 
@@ -313,7 +349,14 @@ def main():
     st.subheader('低血压风险预测')
     try:
         prediction_proba = model.predict_proba(user_input_df)[0][1]
-        risk_level = "高风险" if prediction_proba > 0.5 else "低风险"
+        
+        # 统一风险等级定义
+        if prediction_proba > 0.7:
+            risk_level = "高风险"
+        elif prediction_proba > 0.5:
+            risk_level = "中风险"
+        else:
+            risk_level = "低风险"
         
         # 创建进度条 (将numpy.float32转换为float)
         st.progress(float(prediction_proba))
