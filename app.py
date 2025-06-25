@@ -72,6 +72,17 @@ def preprocess_data(data, feature_names):
 
     # 对分类变量进行独热编码
     categorical_cols = ['gender', 'rrt_type']
+
+    # 为了确保 get_dummies 在处理单行数据时能够正确工作（尤其是在 Streamlit 中），
+    # 我们需要将分类列转换为 Pandas 的 Categorical 类型，并显式指定所有可能的类别。
+    # 这样可以防止 get_dummies 因只看到一个类别而错误地将其丢弃（drop_first=True 的行为）。
+    if 'gender' in data.columns:
+        # 假设训练时 '女' 是基于字母/Unicode顺序被丢弃的基准类别
+        data['gender'] = pd.Categorical(data['gender'], categories=['女', '男'])
+    if 'rrt_type' in data.columns:
+        # 假设训练时 'CRRT' 是基于字母顺序被丢弃的基准类别
+        data['rrt_type'] = pd.Categorical(data['rrt_type'], categories=['CRRT', 'IHD'])
+
     data = pd.get_dummies(data, columns=categorical_cols, drop_first=True)
     
     # 使用 reindex 保证特征列完全对齐
@@ -118,7 +129,7 @@ def sidebar_input_features(feature_names):
     # 定义每个特征的输入参数
     input_params = [
         ('gender', '性别', 'selectbox', ('男', '女'), None, None, None),
-        ('admission_age', '年龄(岁)', 'slider', 18, 100, 60, 1),
+        ('admission_age', '年龄(岁)', 'slider', 18, 100, 100, 1),
         ('congestive_heart_failure', '合并充血性心力衰竭', 'selectbox', ('是', '否'), None, None, None),
         ('peripheral_vascular_disease', '合并外周血管疾病', 'selectbox', ('是', '否'), None, None, None),
         ('dementia', '合并痴呆', 'selectbox', ('是', '否'), None, None, None),
@@ -136,11 +147,13 @@ def sidebar_input_features(feature_names):
     ]
     
     # 创建输入组件
-    for name, display, type, options, min_val, max_val, step in input_params:
+    for name, display, type, p1, p2, p3, p4 in input_params:
         if type == 'slider':
-            user_inputs[name] = st.sidebar.slider(display, min_value=min_val, max_value=max_val, value=options, step=step)
+            # p1: min_val, p2: max_val, p3: default_val, p4: step
+            user_inputs[name] = st.sidebar.slider(display, min_value=p1, max_value=p2, value=p3, step=p4)
         elif type == 'selectbox':
-            user_inputs[name] = st.sidebar.selectbox(display, options)
+            # p1: options
+            user_inputs[name] = st.sidebar.selectbox(display, p1)
     
     # 添加计算的时间差
     user_inputs['icu_to_rrt_hours'] = icu_to_rrt_hours
@@ -233,12 +246,18 @@ def display_local_explanations(model, user_input_df, X_train):
         # 从内存中读取HTML并显示
         components.html(shap_html_path.getvalue(), height=200)
         
+        # 显示SHAP图相关的精确概率值，以验证输入变化
+        prediction_proba = model.predict_proba(user_input_df)[0][1]
+        st.write(f"**当前输入对应的预测概率:** `{prediction_proba:.4f}`")
+        st.write(f"**模型的基准概率 (expected value):** `{explainer.expected_value:.4f}`")
+
         st.info('''
         **SHAP力图说明:**
-        - 显示各特征如何将预测值从基础值推至最终预测值
-        - 红色特征增加低血压风险
-        - 蓝色特征降低低血压风险
-        - 箭头长度表示影响大小
+        - **f(x)**: 模型对当前输入的原始输出值 (log-odds)。
+        - **base value**: 模型的基准预测值，代表未使用任何特征信息时的平均预测。
+        - **红色特征**: 将预测结果推向更高值的因素 (增加低血压风险)。
+        - **蓝色特征**: 将预测结果推向更低值的因素 (降低低血压风险)。
+        - 箭头的长度表示该特征影响的大小。
         ''')
     except Exception as e:
         st.error(f"生成SHAP力图时出错: {e}")

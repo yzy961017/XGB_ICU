@@ -75,6 +75,27 @@ def train_and_save_model(train_data_path: str, test_data_path: str, model_output
         print(f"测试数据处理出错: {e}")
         return
 
+    # 获取训练和测试数据的所有列名
+    train_cols = set(train_data.columns)
+    test_cols = set(test_data.columns)
+
+    # 找出只在训练集中存在的列，并添加到测试集中，填充0
+    missing_in_test = train_cols - test_cols
+    if 'hypotension' in missing_in_test:
+        missing_in_test.remove('hypotension')
+    for col in missing_in_test:
+        test_data[col] = 0
+
+    # 找出只在测试集中存在的列，并添加到训练集中，填充0
+    missing_in_train = test_cols - train_cols
+    if 'hypotension' in missing_in_train:
+        missing_in_train.remove('hypotension')
+    for col in missing_in_train:
+        train_data[col] = 0
+            
+    # 保证测试集和训练集的列顺序完全一致
+    test_data = test_data[train_data.columns]
+
     # 构建特征列表
     # 注意：这里的特征列表是基于预处理后的列名
     binary_cols = [
@@ -84,7 +105,7 @@ def train_and_save_model(train_data_path: str, test_data_path: str, model_output
     ]
     feature_cols = [
         'admission_age', 'ph', 'lactate', 'icu_to_rrt_hours', 'map', 'sap'
-    ] + binary_cols + [col for col in train_data.columns if 'gender_' in col or 'rrt_type_' in col]
+    ] + binary_cols + sorted([col for col in train_data.columns if 'gender_' in col or 'rrt_type_' in col])
     
     # 确保训练集和测试集的列一致
     # 获取训练数据独热编码后的所有特征列
