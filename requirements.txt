@@ -1,10 +1,10 @@
+scikit-learn==0.21.3
 lime
 matplotlib
 numpy
 pandas
 Pillow
 plotly
-scikit-learn
 shap
 streamlit
 xgboost
