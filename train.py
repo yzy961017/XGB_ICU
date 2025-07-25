@@ -183,15 +183,16 @@ def train_and_save_model(train_data_path: str, test_data_path: str, model_output
     final_gbm_model.fit(X_train, y_train)
     print("模型训练完成。")
 
-    print(f"正在将模型保存到 {model_output_path}...")
+    print(f"正在将模型保存到 hypotension_model.pkl ...")
     try:
-        joblib.dump(final_gbm_model, model_output_path)
-        print("模型保存成功。")
-        
+        import pickle
+        with open("hypotension_model.pkl", "wb") as f:
+            pickle.dump(final_gbm_model, f)
+        print("模型以pkl格式保存成功。")
         feature_list_path = "model_features.pkl"
+        import joblib
         joblib.dump(feature_cols, feature_list_path)
         print(f"特征列表保存到 {feature_list_path}")
-        
     except Exception as e:
         print(f"模型或特征列表保存失败: {e}")
 

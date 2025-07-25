@@ -12,7 +12,9 @@ import joblib
 from datetime import datetime
 import streamlit.components.v1 as components
 import io
-
+import pickle
+import warnings
+warnings.filterwarnings("ignore", message="findfont: Generic family 'sans-serif' not found*")
 # --- Font Configuration ---
 # Configure matplotlib for English display
 plt.rcParams['font.sans-serif'] = ['sans-serif']
@@ -28,8 +30,9 @@ st.set_page_config(
 # --- 资源加载 (使用缓存) ---
 @st.cache_resource
 def load_model(model_path):
-    """Load GBM model from joblib format"""
-    model = joblib.load(model_path)
+    """Load GBM model from pickle format"""
+    with open(model_path, "rb") as f:
+        model = pickle.load(f)
     return model
 
 @st.cache_resource
@@ -349,7 +352,7 @@ def main():
     # Load resources
     shap_image = None
     try:
-        model = load_model("hypotension_model.joblib")
+        model = load_model("hypotension_model.pkl")
         feature_names = load_feature_names("model_features.pkl")
         training_data = load_training_data("train.csv") # Ensure train.csv is in same directory
         X_train_processed = preprocess_data(training_data.copy(), feature_names)
@@ -360,7 +363,7 @@ def main():
 
     except Exception as e:
         st.error(f"Error loading model or data: {e}")
-        st.error("Please ensure `hypotension_model.joblib`, `model_features.pkl` and `train.csv` files are in the application root directory.")
+        st.error("Please ensure `hypotension_model.pkl`, `model_features.pkl` and `train.csv` files are in the application root directory.")
         return
     
     # Display model information

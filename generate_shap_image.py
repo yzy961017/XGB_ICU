@@ -2,6 +2,7 @@ import pandas as pd
 import joblib
 import shap
 import matplotlib.pyplot as plt
+import pickle
 
 def preprocess_data(data: pd.DataFrame):
     """对数据进行预处理，与 train.py 中的逻辑保持完全一致"""
@@ -34,7 +35,8 @@ def generate_shap_summary_plot(model_path, data_path, feature_list_path, output_
 
     print("加载GBM模型...")
     try:
-        model = joblib.load(model_path)
+        with open(model_path, "rb") as f:
+            model = pickle.load(f)
         print(f"模型加载成功: {type(model)}")
     except Exception as e:
         print(f"模型加载失败: {e}")
@@ -113,7 +115,7 @@ def generate_shap_summary_plot(model_path, data_path, feature_list_path, output_
         return
 
 if __name__ == "__main__":
-    MODEL_FILE = "hypotension_model.joblib"  # 更新为joblib格式
+    MODEL_FILE = "hypotension_model.pkl"  # 更新为pkl格式
     DATA_FILE = "test.csv"  # 使用测试集来生成SHAP图
     FEATURES_FILE = "model_features.pkl"
     OUTPUT_IMAGE_FILE = "shap.png"
