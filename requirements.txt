@@ -4,7 +4,7 @@ numpy
 pandas
 Pillow
 plotly
-scikit-learn==1.3.2
+scikit-learn
 shap
 streamlit
 xgboost
