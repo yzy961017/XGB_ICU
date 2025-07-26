@@ -10,16 +10,16 @@ def preprocess_data(data: pd.DataFrame):
         data = data.drop('Unnamed: 0', axis=1)
 
     # 处理vasoactive.drugs列名中的点号
-    if 'vasoactive.drugs' in data.columns:
-        data = data.rename(columns={'vasoactive.drugs': 'vasoactive_drugs'})
+    if 'Vasoactive_drugs' in data.columns:
+        data = data.rename(columns={'Vasoactive_drugs': 'Vasoactive_drugs'})
 
     # 将性别转换为数值 (M=1, F=0)
-    if 'gender' in data.columns:
-        data['gender'] = data['gender'].map({'M': 1, 'F': 0})
+    if 'Gender' in data.columns:
+        data['Gender'] = data['Gender'].map({'M': 1, 'F': 0})
     
     # 对RRT类型进行独热编码
-    if 'rrt_type' in data.columns:
-        data = pd.get_dummies(data, columns=['rrt_type'], prefix='rrt_type', drop_first=True, dtype=int)
+    if 'RRT_modality_IHD' in data.columns:
+        data = pd.get_dummies(data, columns=['RRT_modality_IHD'], prefix='RRT_modality_IHD', drop_first=True, dtype=int)
     
     return data
 
