@@ -68,7 +68,7 @@ def preprocess_data(data, feature_names):
                 data[col] = data[col].map(binary_map)
 
     # Handle gender encoding
-    if 'gender' in data.columns:
+    if 'Gender' in data.columns:
         data['Gender'] = data['Gender'].map({'Male': 1, 'Female': 0})
 
     # One-hot encode RRT type
