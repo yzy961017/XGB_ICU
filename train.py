@@ -91,21 +91,21 @@ def train_and_save_model(train_data_path: str, test_data_path: str, model_output
 
     # 根据实际数据构建特征列表
     feature_cols = [
-        'gender',                    # Gender
-        'admission_age',             # Age
-        'congestive_heart_failure',  # Congestive heart failure
-        'peripheral_vascular_disease', # Peripheral vascular disease
-        'dementia',                  # Dementia
-        'chronic_pulmonary_disease', # Chronic pulmonary disease
-        'mild_liver_disease',        # Liver disease
-        'diabetes_without_cc',       # Diabetes
-        'malignant_cancer',          # Cancer
-        'vasoactive_drugs',          # Vasoactive drugs
-        'ph',                        # PH
-        'lactate',                   # Lactate
-        'map',                       # MAP
-        'sap',                       # SAP
-        'icu_to_rrt_hours'           # ICU to RRT initiation
+        'Gender',                    # Gender
+        'Age',             # Age
+        'Congestive_heart_failure',  # Congestive heart failure
+        'Peripheral_vascular_disease', # Peripheral vascular disease
+        'Dementia',                  # Dementia
+        'Chronic_pulmonary_disease', # Chronic pulmonary disease
+        'Liver_disease',        # Liver disease
+        'Diabetes',       # Diabetes
+        'Cancer',          # Cancer
+        'Vasoactive_drugs',          # Vasoactive drugs
+        'PH',                        # PH
+        'Lactate',                   # Lactate
+        'MAP',                       # MAP
+        'SAP',                       # SAP
+        'ICU_to_RRT_initiation'           # ICU to RRT initiation
     ]
     
     # 添加RRT类型的独热编码列（如果存在）
