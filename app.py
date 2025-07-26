@@ -58,9 +58,9 @@ def preprocess_data(data, feature_names):
     """Preprocess data consistent with training for explainer background dataset"""
     # Convert 'Yes'/'No' to binary
     binary_map = {'Yes': 1, 'No': 0}
-    binary_cols = ['congestive_heart_failure', 'peripheral_vascular_disease', 'dementia', 
-                   'chronic_pulmonary_disease', 'mild_liver_disease', 'diabetes_without_cc', 
-                   'malignant_cancer', 'metastatic_solid_tumor', 'vasoactive_drugs']
+    binary_cols = ['Congestive_heart_failure', 'Peripheral_vascular_disease', 'Dementia', 
+                   'Chronic_pulmonary_disease', 'Liver_disease', 'Diabetes', 
+                   'Cancer', 'vasoactive_drugs']
     
     for col in binary_cols:
         if col in data.columns:
@@ -69,12 +69,12 @@ def preprocess_data(data, feature_names):
 
     # Handle gender encoding
     if 'gender' in data.columns:
-        data['gender'] = data['gender'].map({'Male': 1, 'Female': 0})
+        data['Gender'] = data['Gender'].map({'Male': 1, 'Female': 0})
 
     # One-hot encode RRT type
-    if 'rrt_type' in data.columns:
-        data['rrt_type_IHD'] = (data['rrt_type'] == 'IHD').astype(int)
-        data = data.drop('rrt_type', axis=1)
+    if 'RRT_modality_IHD' in data.columns:
+        data['RRT_modality_IHD'] = (data['RRT_modality_IHD'] == 'IHD').astype(int)
+        data = data.drop('RRT_modality_IHD', axis=1)
     
     # Ensure feature alignment
     X = data.reindex(columns=feature_names, fill_value=0)
@@ -119,22 +119,21 @@ def sidebar_input_features(feature_names):
     
     # Define input parameters for each feature
     input_params = [
-        ('gender', 'Gender', 'selectbox', ('Male', 'Female'), None, None, None),
-        ('admission_age', 'Age (years)', 'slider', 18, 100, 65, 1),
-        ('congestive_heart_failure', 'Congestive Heart Failure', 'selectbox', ('Yes', 'No'), None, None, None),
-        ('peripheral_vascular_disease', 'Peripheral Vascular Disease', 'selectbox', ('Yes', 'No'), None, None, None),
-        ('dementia', 'Dementia', 'selectbox', ('Yes', 'No'), None, None, None),
-        ('chronic_pulmonary_disease', 'Chronic Pulmonary Disease', 'selectbox', ('Yes', 'No'), None, None, None),
-        ('mild_liver_disease', 'Mild Liver Disease', 'selectbox', ('Yes', 'No'), None, None, None),
-        ('diabetes_without_cc', 'Diabetes without Complications', 'selectbox', ('Yes', 'No'), None, None, None),
-        ('malignant_cancer', 'Malignant Cancer', 'selectbox', ('Yes', 'No'), None, None, None),
-        ('metastatic_solid_tumor', 'Metastatic Solid Tumor', 'selectbox', ('Yes', 'No'), None, None, None),
+        ('Gender', 'Gender', 'selectbox', ('Male', 'Female'), None, None, None),
+        ('Age', 'Age (years)', 'slider', 18, 100, 65, 1),
+        ('Congestive_heart_failure', 'Congestive Heart Failure', 'selectbox', ('Yes', 'No'), None, None, None),
+        ('Peripheral_vascular_disease', 'Peripheral Vascular Disease', 'selectbox', ('Yes', 'No'), None, None, None),
+        ('Dementia', 'Dementia', 'selectbox', ('Yes', 'No'), None, None, None),
+        ('Chronic_pulmonary_disease', 'Chronic Pulmonary Disease', 'selectbox', ('Yes', 'No'), None, None, None),
+        ('Liver_disease', 'Mild Liver Disease', 'selectbox', ('Yes', 'No'), None, None, None),
+        ('Diabetes', 'Diabetes', 'selectbox', ('Yes', 'No'), None, None, None),
+        ('Cancer', 'Cancer', 'selectbox', ('Yes', 'No'), None, None, None),
         ('vasoactive_drugs', 'Vasoactive Drugs', 'selectbox', ('Yes', 'No'), None, None, None),
-        ('ph', 'Latest pH Value', 'slider', 7.00, 8.00, 7.40, 0.01),
-        ('lactate', 'Latest Lactate Value (mmol/L)', 'slider', 0.0, 25.0, 2.0, 0.1),
-        ('rrt_type', 'RRT Modality', 'selectbox', ('CRRT', 'IHD'), None, None, None),
-        ('sofa_score', 'SOFA Score', 'slider', 0, 24, 10, 1),
-        ('map', 'Mean Arterial Pressure (mmHg)', 'slider', 0, 250, 80, 1),
+        ('PH', 'Latest pH Value', 'slider', 7.00, 8.00, 7.40, 0.01),
+        ('Lactate', 'Latest Lactate Value (mmol/L)', 'slider', 0.0, 25.0, 2.0, 0.1),
+        ('RRT_modality_IHD', 'RRT Modality', 'selectbox', ('CRRT', 'IHD'), None, None, None),
+        ('SAP', 'SAP (mmHg)', 'slider', 0, 250, 80, 1),
+        ('MAP', 'MAP (mmHg)', 'slider', 0, 250, 80, 1),
     ]
     
     # Create input components
