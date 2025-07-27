@@ -74,7 +74,7 @@ def preprocess_data(data, feature_names):
     # One-hot encode RRT type
     if 'RRT_modality_IHD' in data.columns:
         data['RRT_modality_IHD'] = (data['RRT_modality_IHD'] == 'IHD').astype(int)
-        data = data.drop('RRT_modality_IHD', axis=1)
+        
     
     # Ensure feature alignment
     X = data.reindex(columns=feature_names, fill_value=0)
