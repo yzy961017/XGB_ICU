@@ -218,14 +218,16 @@ def display_local_explanations(model, user_input_df, X_train):
     
         # --- Alternative Local Explanation ---
     st.write('**Feature Contribution Analysis**')
-    # 计算当前输入样本的 SHAP 值
-explainer = shap.TreeExplainer(model)
-shap_values = explainer.shap_values(user_input_df)
-if isinstance(shap_values, list):
-    shap_values_to_plot = shap_values[1][0, :]
-else:
-    shap_values_to_plot = shap_values[0, :]
     try:
+         # Handle different SHAP output formats for GBM
+        if isinstance(shap_values, list):
+            # For binary classification, use class 1 (positive class)
+            shap_values_to_plot = shap_values[1][0, :]
+            expected_value = explainer.expected_value[1]
+        else:
+            # For single output
+            shap_values_to_plot = shap_values[0, :]
+            expected_value = explainer.expected_value
         # Create a simplified feature contribution analysis
         # This provides similar insights to LIME but with better numerical stability
         
