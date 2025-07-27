@@ -218,6 +218,13 @@ def display_local_explanations(model, user_input_df, X_train):
     
         # --- Alternative Local Explanation ---
     st.write('**Feature Contribution Analysis**')
+    # 计算当前输入样本的 SHAP 值
+explainer = shap.TreeExplainer(model)
+shap_values = explainer.shap_values(user_input_df)
+if isinstance(shap_values, list):
+    shap_values_to_plot = shap_values[1][0, :]
+else:
+    shap_values_to_plot = shap_values[0, :]
     try:
         # Create a simplified feature contribution analysis
         # This provides similar insights to LIME but with better numerical stability
