@@ -219,6 +219,8 @@ def display_local_explanations(model, user_input_df, X_train):
         # --- Alternative Local Explanation ---
     st.write('**Feature Contribution Analysis**')
     try:
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(user_input_df)
          # Handle different SHAP output formats for GBM
         if isinstance(shap_values, list):
             # For binary classification, use class 1 (positive class)
