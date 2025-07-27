@@ -125,7 +125,7 @@ def sidebar_input_features(feature_names):
         ('Peripheral_vascular_disease', 'Peripheral Vascular Disease', 'selectbox', ('Yes', 'No'), None, None, None),
         ('Dementia', 'Dementia', 'selectbox', ('Yes', 'No'), None, None, None),
         ('Chronic_pulmonary_disease', 'Chronic Pulmonary Disease', 'selectbox', ('Yes', 'No'), None, None, None),
-        ('Liver_disease', 'Mild Liver Disease', 'selectbox', ('Yes', 'No'), None, None, None),
+        ('Liver_disease', 'Liver Disease', 'selectbox', ('Yes', 'No'), None, None, None),
         ('Diabetes', 'Diabetes', 'selectbox', ('Yes', 'No'), None, None, None),
         ('Cancer', 'Cancer', 'selectbox', ('Yes', 'No'), None, None, None),
         ('vasoactive_drugs', 'Vasoactive Drugs', 'selectbox', ('Yes', 'No'), None, None, None),
@@ -146,7 +146,7 @@ def sidebar_input_features(feature_names):
             user_inputs[name] = st.sidebar.selectbox(display, p1)
     
     # Add calculated time difference
-    user_inputs['icu_to_rrt_hours'] = icu_to_rrt_hours
+    user_inputs['ICU_to_RRT_initiation'] = icu_to_rrt_hours
     
     # Convert user inputs to DataFrame
     input_df = pd.DataFrame([user_inputs])
