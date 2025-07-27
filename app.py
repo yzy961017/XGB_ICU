@@ -150,7 +150,10 @@ def sidebar_input_features(feature_names):
     
     # Convert user inputs to DataFrame
     input_df = pd.DataFrame([user_inputs])
-
+    
+    if 'RRT_modality_IHD' in input_df.columns:
+        input_df['RRT_modality_IHD'] = (input_df['RRT_modality_IHD'] == 'IHD').astype(int)
+        
     # Use same preprocessing pipeline as training data
     output_df = preprocess_data(input_df, feature_names)
 
