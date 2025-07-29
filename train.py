@@ -15,6 +15,29 @@ def preprocess_data(data: pd.DataFrame):
     if 'Unnamed: 0' in data.columns:
         data = data.drop('Unnamed: 0', axis=1)
     
+    # --- 列名映射：将实际CSV列名映射为模型期望的列名 ---
+    column_mapping = {
+        'Gender': 'gender',
+        'Age': 'admission_age',
+        'Congestive_heart_failure': 'congestive_heart_failure',
+        'Peripheral_vascular_disease': 'peripheral_vascular_disease',
+        'Dementia': 'dementia',
+        'Chronic_pulmonary_disease': 'chronic_pulmonary_disease',
+        'Liver_disease': 'mild_liver_disease',
+        'Diabetes': 'diabetes_without_cc',
+        'Cancer': 'malignant_cancer',
+        'Vasoactive_drugs': 'vasoactive_drugs',
+        'PH': 'ph',
+        'Lactate': 'lactate',
+        'MAP': 'map',
+        'SAP': 'sap',
+        'ICU_to_RRT_initiation': 'icu_to_rrt_hours',
+        'RRT_modality_IHD': 'rrt_type'
+    }
+    
+    # 应用列名映射
+    data = data.rename(columns=column_mapping)
+    
     # --- 标准化特征名称 ---
     # 处理vasoactive.drugs列名中的点号
     if 'vasoactive.drugs' in data.columns:
@@ -22,12 +45,12 @@ def preprocess_data(data: pd.DataFrame):
     
     # --- 数据预处理 ---
     # 1. 将性别转换为数值 (M=1, F=0)
-    if 'Gender' in data.columns:
-        data['Gender'] = data['Gender'].map({'M': 1, 'F': 0})
+    if 'gender' in data.columns:
+        data['gender'] = data['gender'].map({'M': 1, 'F': 0})
     
     # 2. 对RRT类型进行独热编码
-    if 'RRT_modality_IHD' in data.columns:
-        data = pd.get_dummies(data, columns=['RRT_modality_IHD'], prefix='RRT_modality_IHD', drop_first=True, dtype=int)
+    if 'rrt_type' in data.columns:
+        data = pd.get_dummies(data, columns=['rrt_type'], prefix='rrt_type', drop_first=True, dtype=int)
     
     return data
 
@@ -91,21 +114,21 @@ def train_and_save_model(train_data_path: str, test_data_path: str, model_output
 
     # 根据实际数据构建特征列表
     feature_cols = [
-        'Gender',                    # Gender
-        'Age',             # Age
-        'Congestive_heart_failure',  # Congestive heart failure
-        'Peripheral_vascular_disease', # Peripheral vascular disease
-        'Dementia',                  # Dementia
-        'Chronic_pulmonary_disease', # Chronic pulmonary disease
-        'Liver_disease',        # Liver disease
-        'Diabetes',       # Diabetes
-        'Cancer',          # Cancer
-        'Vasoactive_drugs',          # Vasoactive drugs
-        'PH',                        # PH
-        'Lactate',                   # Lactate
-        'MAP',                       # MAP
-        'SAP',                       # SAP
-        'ICU_to_RRT_initiation'           # ICU to RRT initiation
+        'gender',                    # Gender
+        'admission_age',             # Age
+        'congestive_heart_failure',  # Congestive heart failure
+        'peripheral_vascular_disease', # Peripheral vascular disease
+        'dementia',                  # Dementia
+        'chronic_pulmonary_disease', # Chronic pulmonary disease
+        'mild_liver_disease',        # Liver disease
+        'diabetes_without_cc',       # Diabetes
+        'malignant_cancer',          # Cancer
+        'vasoactive_drugs',          # Vasoactive drugs
+        'ph',                        # PH
+        'lactate',                   # Lactate
+        'map',                       # MAP
+        'sap',                       # SAP
+        'icu_to_rrt_hours'           # ICU to RRT initiation
     ]
     
     # 添加RRT类型的独热编码列（如果存在）

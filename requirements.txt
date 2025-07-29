@@ -7,4 +7,3 @@ Pillow
 plotly
 shap
 streamlit
-xgboost
