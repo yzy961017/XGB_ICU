@@ -9,17 +9,40 @@ def preprocess_data(data: pd.DataFrame):
     if 'Unnamed: 0' in data.columns:
         data = data.drop('Unnamed: 0', axis=1)
 
+    # --- 列名映射：将实际CSV列名映射为模型期望的列名 ---
+    column_mapping = {
+        'Gender': 'gender',
+        'Age': 'admission_age',
+        'Congestive_heart_failure': 'congestive_heart_failure',
+        'Peripheral_vascular_disease': 'peripheral_vascular_disease',
+        'Dementia': 'dementia',
+        'Chronic_pulmonary_disease': 'chronic_pulmonary_disease',
+        'Liver_disease': 'mild_liver_disease',
+        'Diabetes': 'diabetes_without_cc',
+        'Cancer': 'malignant_cancer',
+        'Vasoactive_drugs': 'vasoactive_drugs',
+        'PH': 'ph',
+        'Lactate': 'lactate',
+        'MAP': 'map',
+        'SAP': 'sap',
+        'ICU_to_RRT_initiation': 'icu_to_rrt_hours',
+        'RRT_modality_IHD': 'rrt_type'
+    }
+    
+    # 应用列名映射
+    data = data.rename(columns=column_mapping)
+
     # 处理vasoactive.drugs列名中的点号
-    if 'Vasoactive_drugs' in data.columns:
-        data = data.rename(columns={'Vasoactive_drugs': 'Vasoactive_drugs'})
+    if 'vasoactive.drugs' in data.columns:
+        data = data.rename(columns={'vasoactive.drugs': 'vasoactive_drugs'})
 
     # 将性别转换为数值 (M=1, F=0)
-    if 'Gender' in data.columns:
-        data['Gender'] = data['Gender'].map({'M': 1, 'F': 0})
+    if 'gender' in data.columns:
+        data['gender'] = data['gender'].map({'M': 1, 'F': 0})
     
     # 对RRT类型进行独热编码
-    if 'RRT_modality_IHD' in data.columns:
-        data = pd.get_dummies(data, columns=['RRT_modality_IHD'], prefix='RRT_modality_IHD', drop_first=True, dtype=int)
+    if 'rrt_type' in data.columns:
+        data = pd.get_dummies(data, columns=['rrt_type'], prefix='rrt_type', drop_first=True, dtype=int)
     
     return data
 
@@ -28,10 +51,16 @@ def generate_shap_summary_plot(model_path, data_path, feature_list_path, output_
     加载GBM模型和测试数据，生成并保存SHAP摘要图（蜂窝散点图）。
     """
     try:
-        plt.rcParams['font.sans-serif'] = ['SimHei']
+        # 设置字体以避免警告
+        import matplotlib
+        matplotlib.use('Agg')  # 使用非交互式后端
+        plt.rcParams['font.family'] = 'DejaVu Sans'
         plt.rcParams['axes.unicode_minus'] = False
+        # 禁用字体警告
+        import warnings
+        warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib')
     except Exception:
-        print("警告: 未找到中文字体'SimHei'，图表可能无法正确显示中文。")
+        print("警告: 字体配置失败，使用默认设置。")
 
     print("加载GBM模型...")
     try:

@@ -14,11 +14,19 @@ import streamlit.components.v1 as components
 import io
 import pickle
 import warnings
-warnings.filterwarnings("ignore", message="findfont: Generic family 'sans-serif' not found*")
+# 禁用所有matplotlib字体相关警告
+warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
+warnings.filterwarnings("ignore", message="findfont:*")
+
 # --- Font Configuration ---
-# Configure matplotlib for English display
-plt.rcParams['font.sans-serif'] = ['sans-serif']
+# Configure matplotlib to avoid font warnings
+import matplotlib
+matplotlib.use('Agg')  # 使用非交互式后端
+plt.rcParams['font.family'] = 'DejaVu Sans'
 plt.rcParams['axes.unicode_minus'] = False
+# 设置日志级别以减少字体警告
+import logging
+logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -26,6 +34,90 @@ st.set_page_config(
     page_icon='💉',
     layout='wide'
 )
+
+# --- 简化的CSS样式 ---
+st.markdown("""
+<style>
+    /* 主题色彩配置 */
+    :root {
+        --primary-color: #1E90FF;
+        --success-color: #4CAF50;
+        --warning-color: #FF9800;
+        --error-color: #F44336;
+        --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* 主容器样式 */
+    .main .block-container {
+        padding-top: 1rem;
+        padding-bottom: 2rem;
+        background: #f8f9fa;
+    }
+    
+    /* 标题样式 */
+    .main-title {
+        color: #1E90FF;
+        font-size: 2.5rem;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    
+    /* 卡片样式 */
+    .prediction-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 10px;
+        box-shadow: var(--card-shadow);
+        margin: 1rem 0;
+        border-left: 4px solid var(--primary-color);
+    }
+    
+    /* 指标卡片 */
+    .metric-card {
+        background: white;
+        color: #333;
+        padding: 1rem;
+        border-radius: 10px;
+        text-align: center;
+        margin: 0.5rem;
+        box-shadow: var(--card-shadow);
+        border: 2px solid #e0e0e0;
+    }
+    
+    /* 风险等级颜色 */
+    .risk-high {
+        border-color: var(--error-color);
+        background: #ffebee;
+    }
+    
+    .risk-moderate {
+        border-color: var(--warning-color);
+        background: #fff8e1;
+    }
+    
+    .risk-low {
+        border-color: var(--success-color);
+        background: #e8f5e8;
+    }
+    
+    /* 按钮样式 */
+    .stButton > button {
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 1.5rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+    
+    .stButton > button:hover {
+        background: #1976D2;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # --- 资源加载 (使用缓存) ---
 @st.cache_resource
@@ -56,11 +148,34 @@ def load_training_data(data_path="train.csv"):
 
 def preprocess_data(data, feature_names):
     """Preprocess data consistent with training for explainer background dataset"""
+    # Column mapping from CSV to model features
+    column_mapping = {
+        'Gender': 'gender',
+        'Age': 'admission_age', 
+        'Congestive_heart_failure': 'congestive_heart_failure',
+        'Peripheral_vascular_disease': 'peripheral_vascular_disease',
+        'Dementia': 'dementia',
+        'Chronic_pulmonary_disease': 'chronic_pulmonary_disease',
+        'Liver_disease': 'mild_liver_disease',
+        'Diabetes': 'diabetes_without_cc',
+        'Cancer': 'malignant_cancer',
+        'Vasoactive_drugs': 'vasoactive_drugs',
+        'PH': 'ph',
+        'Lactate': 'lactate',
+        'MAP': 'map',
+        'SAP': 'sap',
+        'ICU_to_RRT_initiation': 'icu_to_rrt_hours',
+        'RRT_modality_IHD': 'rrt_type'
+    }
+    
+    # Apply column mapping
+    data = data.rename(columns=column_mapping)
+    
     # Convert 'Yes'/'No' to binary
     binary_map = {'Yes': 1, 'No': 0}
-    binary_cols = ['Congestive_heart_failure', 'Peripheral_vascular_disease', 'Dementia', 
-                   'Chronic_pulmonary_disease', 'Liver_disease', 'Diabetes', 
-                   'Cancer', 'vasoactive_drugs']
+    binary_cols = ['congestive_heart_failure', 'peripheral_vascular_disease', 'dementia', 
+                   'chronic_pulmonary_disease', 'mild_liver_disease', 'diabetes_without_cc', 
+                   'malignant_cancer', 'vasoactive_drugs']
     
     for col in binary_cols:
         if col in data.columns:
@@ -68,13 +183,19 @@ def preprocess_data(data, feature_names):
                 data[col] = data[col].map(binary_map)
 
     # Handle gender encoding
-    if 'Gender' in data.columns:
-        data['Gender'] = data['Gender'].map({'Male': 1, 'Female': 0})
+    if 'gender' in data.columns:
+        # Handle both user input format (Male/Female) and CSV format (M/F)
+        gender_map = {'M': 1, 'F': 0, 'Male': 1, 'Female': 0}
+        data['gender'] = data['gender'].map(gender_map)
 
     # One-hot encode RRT type
-    if 'RRT_modality_IHD' in data.columns:
-        data['RRT_modality_IHD'] = (data['RRT_modality_IHD'] == 'IHD').astype(int)
-        
+    if 'rrt_type' in data.columns:
+        # Handle both string format (CRRT/IHD) and numeric format (0/1)
+        if data['rrt_type'].dtype == 'object':
+            # Convert string to numeric: IHD=1, CRRT=0
+            data['rrt_type'] = data['rrt_type'].map({'IHD': 1, 'CRRT': 0})
+        data['rrt_type_IHD'] = (data['rrt_type'] == 1).astype(int)
+        data = data.drop('rrt_type', axis=1)
     
     # Ensure feature alignment
     X = data.reindex(columns=feature_names, fill_value=0)
@@ -117,23 +238,24 @@ def sidebar_input_features(feature_names):
     # Feature input components
     st.sidebar.subheader("Patient Characteristics")
     
-    # Define input parameters for each feature
+    # Define input parameters for each feature (matching training features)
     input_params = [
-        ('Gender', 'Gender', 'selectbox', ('Male', 'Female'), None, None, None),
-        ('Age', 'Age (years)', 'slider', 18, 100, 65, 1),
-        ('Congestive_heart_failure', 'Congestive Heart Failure', 'selectbox', ('Yes', 'No'), None, None, None),
-        ('Peripheral_vascular_disease', 'Peripheral Vascular Disease', 'selectbox', ('Yes', 'No'), None, None, None),
-        ('Dementia', 'Dementia', 'selectbox', ('Yes', 'No'), None, None, None),
-        ('Chronic_pulmonary_disease', 'Chronic Pulmonary Disease', 'selectbox', ('Yes', 'No'), None, None, None),
-        ('Liver_disease', 'Liver Disease', 'selectbox', ('Yes', 'No'), None, None, None),
-        ('Diabetes', 'Diabetes', 'selectbox', ('Yes', 'No'), None, None, None),
-        ('Cancer', 'Cancer', 'selectbox', ('Yes', 'No'), None, None, None),
+        ('gender', 'Gender', 'selectbox', ('Male', 'Female'), None, None, None),
+        ('admission_age', 'Age (years)', 'slider', 18, 100, 65, 1),
+        ('congestive_heart_failure', 'Congestive Heart Failure', 'selectbox', ('Yes', 'No'), None, None, None),
+        ('peripheral_vascular_disease', 'Peripheral Vascular Disease', 'selectbox', ('Yes', 'No'), None, None, None),
+        ('dementia', 'Dementia', 'selectbox', ('Yes', 'No'), None, None, None),
+        ('chronic_pulmonary_disease', 'Chronic Pulmonary Disease', 'selectbox', ('Yes', 'No'), None, None, None),
+        ('mild_liver_disease', 'Mild Liver Disease', 'selectbox', ('Yes', 'No'), None, None, None),
+        ('diabetes_without_cc', 'Diabetes without Complications', 'selectbox', ('Yes', 'No'), None, None, None),
+        ('malignant_cancer', 'Malignant Cancer', 'selectbox', ('Yes', 'No'), None, None, None),
         ('vasoactive_drugs', 'Vasoactive Drugs', 'selectbox', ('Yes', 'No'), None, None, None),
-        ('PH', 'Latest pH Value', 'slider', 7.00, 8.00, 7.40, 0.01),
-        ('Lactate', 'Latest Lactate Value (mmol/L)', 'slider', 0.0, 25.0, 2.0, 0.1),
-        ('RRT_modality_IHD', 'RRT Modality', 'selectbox', ('CRRT', 'IHD'), None, None, None),
-        ('SAP', 'SAP (mmHg)', 'slider', 0, 250, 80, 1),
-        ('MAP', 'MAP (mmHg)', 'slider', 0, 250, 80, 1),
+        ('ph', 'Latest pH Value', 'slider', 7.00, 8.00, 7.40, 0.01),
+        ('lactate', 'Latest Lactate Value (mmol/L)', 'slider', 0.0, 25.0, 2.0, 0.1),
+        ('map', 'Mean Arterial Pressure (mmHg)', 'slider', 0, 250, 80, 1),
+        ('sap', 'Systolic Arterial Pressure (mmHg)', 'slider', 0, 300, 120, 1),
+        ('icu_to_rrt_hours', 'ICU to RRT Hours', 'slider', 0, 720, 24, 1),
+        ('rrt_type', 'RRT Modality', 'selectbox', ('CRRT', 'IHD'), None, None, None),
     ]
     
     # Create input components
@@ -146,14 +268,11 @@ def sidebar_input_features(feature_names):
             user_inputs[name] = st.sidebar.selectbox(display, p1)
     
     # Add calculated time difference
-    user_inputs['ICU_to_RRT_initiation'] = icu_to_rrt_hours
+    user_inputs['icu_to_rrt_hours'] = icu_to_rrt_hours
     
     # Convert user inputs to DataFrame
     input_df = pd.DataFrame([user_inputs])
-    
-    if 'RRT_modality_IHD' in input_df.columns:
-        input_df['RRT_modality_IHD'] = (input_df['RRT_modality_IHD'] == 'IHD').astype(int)
-        
+
     # Use same preprocessing pipeline as training data
     output_df = preprocess_data(input_df, feature_names)
 
@@ -219,12 +338,13 @@ def display_local_explanations(model, user_input_df, X_train):
     """Display local model explanations (SHAP force plot and LIME plot)"""
     st.subheader("Local Explanations")
     
-        # --- Alternative Local Explanation ---
-    st.write('**Feature Contribution Analysis**')
+    # --- SHAP Force Plot ---
+    st.write('**SHAP Force Plot**')
     try:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(user_input_df)
-         # Handle different SHAP output formats for GBM
+        
+        # Handle different SHAP output formats for GBM
         if isinstance(shap_values, list):
             # For binary classification, use class 1 (positive class)
             shap_values_to_plot = shap_values[1][0, :]
@@ -233,6 +353,67 @@ def display_local_explanations(model, user_input_df, X_train):
             # For single output
             shap_values_to_plot = shap_values[0, :]
             expected_value = explainer.expected_value
+        
+        # Display precise probability values
+        prediction_proba = model.predict_proba(user_input_df)[0][1]
+        # Convert numpy types to Python float to avoid format string errors
+        prediction_proba_float = float(prediction_proba)
+        expected_value_float = float(expected_value)
+        
+        st.write(f"**Current input prediction probability:** `{prediction_proba_float:.4f}`")
+        st.write(f"**Model baseline probability (expected value):** `{expected_value_float:.4f}`")
+        
+        # Create a simple waterfall-style explanation instead of force plot
+        feature_names = user_input_df.columns.tolist()
+        feature_values = user_input_df.iloc[0].values
+        
+        # Create explanation dataframe
+        explanation_df = pd.DataFrame({
+            'Feature': [name.replace('_', ' ').title() for name in feature_names],
+            'Value': feature_values,
+            'SHAP_Value': shap_values_to_plot
+        })
+        
+        # Sort by absolute SHAP value
+        explanation_df['Abs_SHAP'] = np.abs(explanation_df['SHAP_Value'])
+        explanation_df = explanation_df.sort_values('Abs_SHAP', ascending=False).head(10)
+        
+        # Create horizontal bar chart
+        fig, ax = plt.subplots(figsize=(10, 6))
+        colors = ['#d62728' if x > 0 else '#2ca02c' for x in explanation_df['SHAP_Value']]
+        
+        bars = ax.barh(range(len(explanation_df)), explanation_df['SHAP_Value'], color=colors)
+        ax.set_yticks(range(len(explanation_df)))
+        ax.set_yticklabels(explanation_df['Feature'])
+        ax.set_xlabel('SHAP Value (Impact on Prediction)')
+        ax.set_title('SHAP Feature Impact Analysis')
+        ax.axvline(x=0, color='black', linestyle='-', alpha=0.3)
+        
+        # Add SHAP value annotations
+        for i, (idx, row) in enumerate(explanation_df.iterrows()):
+            shap_text = f"{row['SHAP_Value']:.3f}"
+            # Position SHAP value inside the bar
+            x_pos = row['SHAP_Value'] / 2
+            ax.text(x_pos, i, shap_text, 
+                   va='center', ha='center',
+                   fontsize=9, fontweight='bold', color='white')
+        
+        plt.tight_layout()
+        st.pyplot(fig)
+        plt.close(fig)
+
+        st.info('''
+        **SHAP Analysis Explanation:**
+        - **Red bars (right side)**: Features increasing hypotension risk
+        - **Green bars (left side)**: Features decreasing hypotension risk
+        - Bar length and numbers show the magnitude of each feature's contribution to the final prediction
+        ''')
+    except Exception as e:
+        st.error(f"Error generating SHAP analysis: {e}")
+
+    # --- Alternative Local Explanation ---
+    st.write('**Feature Contribution Analysis**')
+    try:
         # Create a simplified feature contribution analysis
         # This provides similar insights to LIME but with better numerical stability
         
@@ -262,12 +443,14 @@ def display_local_explanations(model, user_input_df, X_train):
         ax.set_title('Individual Feature Impact on Current Prediction')
         ax.axvline(x=0, color='black', linestyle='-', alpha=0.3)
         
-        # Add value annotations
+        # Add SHAP contribution annotations
         for i, (idx, row) in enumerate(feature_contributions.iterrows()):
-            value_text = f"Value: {row['Value']:.2f}"
-            ax.text(0.02 if row['SHAP_Contribution'] > 0 else -0.02, i, value_text, 
-                   va='center', ha='left' if row['SHAP_Contribution'] > 0 else 'right',
-                   fontsize=8, alpha=0.7)
+            shap_text = f"{row['SHAP_Contribution']:.3f}"
+            # Position SHAP value inside the bar
+            x_pos = row['SHAP_Contribution'] / 2
+            ax.text(x_pos, i, shap_text, 
+                   va='center', ha='center',
+                   fontsize=9, fontweight='bold', color='white')
         
         plt.tight_layout()
         st.pyplot(fig)
@@ -278,7 +461,7 @@ def display_local_explanations(model, user_input_df, X_train):
         - Shows how each patient characteristic affects the hypotension risk prediction
         - **<font color='red'>Red bars (right side)</font>**: Features increasing hypotension risk
         - **<font color='green'>Green bars (left side)</font>**: Features decreasing hypotension risk
-        - "Value" shows the actual patient measurement for each feature
+        - Numbers show the SHAP contribution values for each feature
         - Bar length represents the magnitude of impact on the final prediction
         ''', unsafe_allow_html=True)
         
@@ -288,7 +471,15 @@ def display_local_explanations(model, user_input_df, X_train):
 # --- Main Program ---
 def main():
     """Streamlit main function"""
-    st.markdown("<h1 style='text-align: center; color: #1E90FF;'>ICU RRT Hypotension Risk Prediction</h1>", unsafe_allow_html=True)
+    # 简洁的主标题
+    st.markdown("""
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <h1 class="main-title">🏥 ICU RRT Hypotension Risk Prediction</h1>
+        <p style="color: #666; font-size: 1.1rem; margin-bottom: 1rem;">
+            AI-powered prediction system for hypotension risk assessment during renal replacement therapy
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Load resources
     shap_image = None
@@ -307,63 +498,121 @@ def main():
         st.error("Please ensure `hypotension_model.pkl`, `model_features.pkl` and `train.csv` files are in the application root directory.")
         return
     
-    # Display model information
-    st.info('''
-    **About the Model:**
-    • **Prediction Target**: Risk of hypotension during renal replacement therapy (RRT) in ICU patients
-    • **Model Type**: Gradient Boosting Machine (GBM)
-    • **Instructions for Use**: After entering patient characteristics on the left panel, the system will calculate the real-time probability of hypotension.
+    # 简化的模型信息部分
+    st.markdown("""
     
-    ⚠️ **Note**: This model is intended solely for pre-RRT prediction of hypotension risk. It should not be used as a basis for selecting between IHD and CRRT modalities.
+    <div style="background: #fff8e1; padding: 1rem; border-radius: 8px; border-left: 4px solid #ff9800; margin-bottom: 1rem;">
+        <p><strong>⚠️ Important Notes:</strong></p>
+        <ul>
+            <li>This model is designed for <strong>pre-RRT hypotension risk prediction only</strong></li>
+            <li>Should <strong>not</strong> be used for selecting between IHD and CRRT modalities</li>
+            <li>Results should be interpreted alongside clinical judgment and patient context</li>
+        </ul>
+    </div>
     
-    ⚠️ **Disclaimer**: This prediction model is designed to assist, not replace, clinical judgment. It estimates the risk of hypotension based on historical data and identified risk factors, but it does not guarantee the actual occurrence or absence of hypotension.
-    ''')
+    <div style="background: #fce4ec; padding: 1rem; border-radius: 8px; border-left: 4px solid #e91e63;">
+        <p><strong>⚖️ Medical Disclaimer:</strong> This AI prediction model is designed to <strong>assist, not replace</strong> clinical judgment. 
+        It provides risk estimates based on historical data and identified risk factors, but does not guarantee 
+        the actual occurrence or absence of hypotension. Always consult with qualified healthcare professionals 
+        for medical decisions.</p>
+    </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Sidebar input
     with st.spinner("Loading input form..."):
         user_input_df = sidebar_input_features(feature_names)
     
-    # Prediction
-    st.subheader('Hypotension Risk Prediction')
+    # 预测结果部分
+    st.markdown("""
+    <div class="prediction-card">
+        <h2 style="color: #1E90FF; margin-bottom: 1rem;">🎯 Hypotension Risk Prediction</h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
     try:
         prediction_proba = model.predict_proba(user_input_df)[0][1]
         
         # Unified risk level definition (≥73% is high risk)
         if prediction_proba >= 0.73:
             risk_level = "High Risk"
+            risk_class = "risk-high"
+            risk_icon = "🔴"
         elif prediction_proba >= 0.5:
             risk_level = "Moderate Risk"
+            risk_class = "risk-moderate"
+            risk_icon = "🟡"
         else:
             risk_level = "Low Risk"
+            risk_class = "risk-low"
+            risk_icon = "🟢"
         
-        # Create progress bar (convert numpy.float32 to float)
+        # 进度条显示
+        # st.markdown("<div class='prediction-card'>", unsafe_allow_html=True)
+        st.markdown(f"**Hypotension Probability: {prediction_proba:.2%}**")
         st.progress(float(prediction_proba))
+        st.markdown("</div>", unsafe_allow_html=True)
         
-        # Display prediction results
-        col1, col2 = st.columns(2)
+        # 指标显示
+        col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric(label="Hypotension Probability", value=f"{prediction_proba:.2%}")
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3>📊 Probability</h3>
+                <h2>{prediction_proba:.2%}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+        
         with col2:
-            st.metric(label="Risk Level", value=risk_level)
+            st.markdown(f"""
+            <div class="metric-card {risk_class}">
+                <h3>{risk_icon} Risk Level</h3>
+                <h2>{risk_level}</h2>
+            </div>
+            """, unsafe_allow_html=True)
             
-        # Risk interpretation
+        with col3:
+            confidence = "High" if abs(prediction_proba - 0.5) > 0.2 else "Medium"
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3>🎯 Confidence</h3>
+                <h2>{confidence}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        # 风险解释
+        st.markdown("<br>", unsafe_allow_html=True)
         if prediction_proba >= 0.73:
-            st.warning("⚠️ High Risk Alert: This patient has a high probability of developing hypotension. Preventive measures are recommended.")
+            st.error("🚨 **High Risk Alert**: This patient has a high probability of developing hypotension. Immediate preventive measures and close monitoring are strongly recommended.")
         elif prediction_proba >= 0.5:
-            st.warning("⚠️ Moderate Risk Alert: This patient has some risk of hypotension. Close monitoring is recommended.")
+            st.warning("⚠️ **Moderate Risk Alert**: This patient has some risk of hypotension. Enhanced monitoring and preparedness for intervention are recommended.")
         else:
-            st.success("✅ Low Risk: This patient has a low risk of hypotension.")
+            st.success("✅ **Low Risk**: This patient has a low risk of hypotension. Standard monitoring protocols are sufficient.")
             
     except Exception as e:
         st.error(f"Prediction error: {e}")
     
-    # Feature importance explanation
-    st.subheader("Feature Importance Explanation")
-    display_global_explanations(model, X_train_processed, shap_image)
+    # 特征重要性解释部分
+    st.markdown("""
+    <div class="prediction-card">
+        <h2 style="color: #1E90FF; margin-bottom: 1rem;">📈 Feature Importance Analysis</h2>
+        <p style="color: #666; margin-bottom: 1rem;">Understanding which factors contribute most to hypotension risk predictions</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Local explanation
-    st.subheader("Current Prediction Explanation")
-    display_local_explanations(model, user_input_df, X_train_processed)
+    with st.container():
+        display_global_explanations(model, X_train_processed, shap_image)
+    
+    # 个人预测解释部分
+    st.markdown("""
+    <div class="prediction-card">
+        <h2 style="color: #1E90FF; margin-bottom: 1rem;">🔍 Individual Prediction Analysis</h2>
+        <p style="color: #666; margin-bottom: 1rem;">How each patient characteristic influences the current prediction</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.container():
+        display_local_explanations(model, user_input_df, X_train_processed)
 
 if __name__ == "__main__":
     main()
